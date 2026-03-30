@@ -9,6 +9,10 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-vgoire-blue text-white font-sans;
   }

@@ -136,6 +136,7 @@ const ServiceCard = ({ service, lang, onClick }: { service: Service, lang: Langu
 
   return (
     <motion.div
+      id={`service-card-${service.id}`}
       whileHover={{ y: -8 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
@@ -179,8 +180,16 @@ const ServiceDetail = ({ service, lang, onBack, onLangChange }: { service: Servi
   const content = service.translations[lang];
   const t = UI_STRINGS[lang];
   const isRtl = LANGUAGES.find(l => l.code === lang)?.dir === 'rtl';
-
   const whatsappUrl = WHATSAPP_BASE_URL;
+
+  // Salvar posição de scroll quando voltar
+  useEffect(() => {
+    // Salvar scroll atual quando mudar de rota
+    const handleBeforeUnload = () => {
+      sessionStorage.setItem('scrollPosition', window.scrollY.toString());
+    };
+    return () => handleBeforeUnload();
+  }, []);
 
   return (
     <motion.div
@@ -190,6 +199,19 @@ const ServiceDetail = ({ service, lang, onBack, onLangChange }: { service: Servi
       className="min-h-screen bg-vgoire-blue luxury-bg pb-20"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
+      {/* Botão Fixo no Topo */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/40 via-black/20 to-transparent pointer-events-none flex items-center justify-between px-6 py-4">
+        <button 
+          onClick={onBack}
+          className={`w-12 h-12 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-vgoire-gold hover:text-vgoire-blue transition-all border border-white/10 shadow-xl pointer-events-auto`}
+        >
+          <ChevronLeft className={`w-6 h-6 ${isRtl ? 'rotate-180' : ''}`} />
+        </button>
+        <div className="pointer-events-auto">
+          <LanguageSelector currentLang={lang} onSelect={onLangChange} />
+        </div>
+      </div>
+
       <div className="relative h-[45vh] overflow-hidden">
         <img 
           src={service.image} 
@@ -198,15 +220,6 @@ const ServiceDetail = ({ service, lang, onBack, onLangChange }: { service: Servi
           referrerPolicy="no-referrer"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-vgoire-blue/40 via-transparent to-vgoire-blue" />
-        <button 
-          onClick={onBack}
-          className={`absolute top-8 ${isRtl ? 'right-8' : 'left-8'} w-12 h-12 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-vgoire-gold hover:text-vgoire-blue transition-all border border-white/10 shadow-xl z-20`}
-        >
-          <ChevronLeft className={`w-6 h-6 ${isRtl ? 'rotate-180' : ''}`} />
-        </button>
-        <div className={`absolute top-8 ${isRtl ? 'left-8' : 'right-8'} z-20`}>
-          <LanguageSelector currentLang={lang} onSelect={onLangChange} />
-        </div>
       </div>
 
       <div className="px-6 -mt-16 relative z-10 max-w-3xl mx-auto">
@@ -384,167 +397,171 @@ const ServiceDetail = ({ service, lang, onBack, onLangChange }: { service: Servi
 };
 
 // --- Main App ---
+import { Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
 
-export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [lang, setLang] = useState<Language>('en');
+// Componente da Tela Inicial (Lista de Serviços)
+const Home = ({ lang, setLang, showSplash, setShowSplash }: { lang: Language, setLang: (lang: Language) => void, showSplash: boolean, setShowSplash: (show: boolean) => void }) => {
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const navigate = useNavigate();
 
+  // Redireciona links antigos (?service=id) para o novo padrão de rotas do React Router
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const serviceId = params.get('service');
     if (serviceId) {
-      const service = SERVICES.find(s => s.id === serviceId);
-      if (service) {
-        setSelectedService(service);
-        setShowSplash(false);
-      }
+      navigate(`/service/${serviceId}`, { replace: true });
+    }
+  }, [navigate]);
+
+  // Restaurar posição de scroll quando voltar para Home
+  useEffect(() => {
+    const lastServiceId = localStorage.getItem('lastServiceId');
+    if (lastServiceId) {
+      // Aguarda um pouco para garantir que o DOM está renderizado
+      setTimeout(() => {
+        const element = document.getElementById(`service-card-${lastServiceId}`);
+        if (element) {
+          // Scroll suave para o elemento
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      localStorage.removeItem('lastServiceId');
     }
   }, []);
 
   const t = UI_STRINGS[lang];
+
+  return (
+    <AnimatePresence mode="wait">
+      {showSplash ? (
+        <SplashScreen key="splash" onComplete={() => setShowSplash(false)} lang={lang} />
+      ) : (
+        <motion.div
+          key="main"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="luxury-bg min-h-screen"
+        >
+          <nav className="sticky top-0 z-40 bg-vgoire-blue/80 backdrop-blur-xl border-b border-white/10 px-6 py-4">
+            <div className="max-w-5xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-vgoire-blue rounded-lg flex items-center justify-center shadow-lg overflow-hidden border border-vgoire-gold/30">
+                  <img src="icon.png" alt="VGOIRE Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                </div>
+                <span className="text-xl font-black text-white tracking-tighter">VGOIRE</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <LanguageSelector currentLang={lang} onSelect={setLang} />
+              </div>
+            </div>
+          </nav>
+
+          <div className="max-w-5xl mx-auto px-6 pt-12 pb-24">
+            <header className="flex flex-col items-center mb-16 text-center">
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mb-6 flex flex-col items-center gap-6">
+                <div className="flex items-center gap-6">
+                  <div className="w-20 h-20 bg-vgoire-blue rounded-2xl flex items-center justify-center shadow-xl overflow-hidden border-2 border-vgoire-gold/30">
+                    <img src="icon.png" alt="VGOIRE Icon" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  </div>
+                  <h1 className="text-6xl font-black text-white tracking-tighter drop-shadow-2xl">VGOIRE</h1>
+                </div>
+              </motion.div>
+              <div className="h-1 w-32 bg-vgoire-gold mx-auto rounded-full mb-4" />
+              <p className="text-vgoire-gold font-bold tracking-[0.4em] uppercase text-xs">{t.tagline}</p>
+            </header>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {SERVICES.map((service) => (
+                <ServiceCard 
+                  key={service.id} 
+                  service={service} 
+                  lang={lang}
+                  onClick={() => {
+                    // Salva qual serviço foi clicado para scroll posterior
+                    localStorage.setItem('lastServiceId', service.id);
+                    navigate(`/service/${service.id}`);
+                  }}
+                />
+              ))}
+            </div>
+
+            <footer className="mt-24 pt-12 border-t border-white/10 flex flex-col items-center gap-8">
+              <a href={OFFICIAL_WEBSITE_URL} target="_blank" rel="noopener noreferrer" className="gold-button flex items-center gap-3 px-8">
+                <Globe className="w-5 h-5" />
+                {t.visitWebsite}
+              </a>
+              <div className="text-center text-white/40 text-xs space-y-4">
+                <p>© {new Date().getFullYear()} VGOIRE. All rights reserved.</p>
+                <button onClick={() => setShowPrivacy(true)} className="text-vgoire-gold/60 hover:text-vgoire-gold underline transition-colors">
+                  {t.privacyPolicy}
+                </button>
+                <p className="font-medium text-vgoire-gold/40 tracking-widest uppercase">Excellence • Security • Quality</p>
+              </div>
+            </footer>
+          </div>
+
+          <AnimatePresence>
+            {showPrivacy && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-vgoire-blue border border-vgoire-gold/30 rounded-2xl p-8 max-w-lg w-full shadow-2xl relative">
+                  <button onClick={() => setShowPrivacy(false)} className="absolute top-4 right-4 text-white/60 hover:text-white">
+                    <ChevronLeft className="w-6 h-6 rotate-90" />
+                  </button>
+                  <h2 className="text-2xl font-bold text-vgoire-gold mb-6 uppercase tracking-tight">{t.privacyPolicy}</h2>
+                  <div className="text-gray-200 leading-relaxed text-lg font-light">{t.privacyContent}</div>
+                  <button onClick={() => setShowPrivacy(false)} className="mt-8 w-full gold-button">Close</button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+// Componente da Rota de Detalhes do Serviço
+const ServicePage = ({ lang, setLang }: { lang: Language, setLang: (lang: Language) => void }) => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  
+  // Busca o serviço baseado no ID que está na URL
+  const service = SERVICES.find(s => s.id === id);
+
+  // Restaurar scroll quando volta para home
+  const handleBack = () => {
+    // Apenas navega - o scroll será restaurado automaticamente no Home
+    navigate('/');
+  };
+
+  // Se o serviço não existir (URL inválida), volta para a Home
+  if (!service) {
+    return <Navigate to="/" replace />;
+  }
+
+  return (
+    <ServiceDetail 
+      service={service} 
+      lang={lang}
+      onBack={handleBack}
+      onLangChange={setLang}
+    />
+  );
+};
+
+// Componente App Principal (com gerenciamento de splash global)
+export default function App() {
+  const [lang, setLang] = useState<Language>('en');
+  const [showSplash, setShowSplash] = useState(true);
   const isRtl = LANGUAGES.find(l => l.code === lang)?.dir === 'rtl';
 
   return (
     <div className="min-h-screen bg-vgoire-blue selection:bg-vgoire-gold selection:text-vgoire-blue" dir={isRtl ? 'rtl' : 'ltr'}>
-      <AnimatePresence mode="wait">
-        {showSplash ? (
-          <SplashScreen key="splash" onComplete={() => setShowSplash(false)} lang={lang} />
-        ) : selectedService ? (
-          <ServiceDetail 
-            key="detail"
-            service={selectedService} 
-            lang={lang}
-            onBack={() => setSelectedService(null)} 
-            onLangChange={setLang}
-          />
-        ) : (
-          <motion.div
-            key="main"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="luxury-bg min-h-screen"
-          >
-            <nav className="sticky top-0 z-40 bg-vgoire-blue/80 backdrop-blur-xl border-b border-white/10 px-6 py-4">
-              <div className="max-w-5xl mx-auto flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-vgoire-blue rounded-lg flex items-center justify-center shadow-lg overflow-hidden border border-vgoire-gold/30">
-                    <img 
-                      src="icon.png" 
-                      alt="VGOIRE Logo"
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <span className="text-xl font-black text-white tracking-tighter">VGOIRE</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <LanguageSelector currentLang={lang} onSelect={setLang} />
-                </div>
-              </div>
-            </nav>
-
-            <div className="max-w-5xl mx-auto px-6 pt-12 pb-24">
-              <header className="flex flex-col items-center mb-16 text-center">
-                <motion.div 
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="mb-6 flex flex-col items-center gap-6"
-                >
-                  <div className="flex items-center gap-6">
-                    <div className="w-20 h-20 bg-vgoire-blue rounded-2xl flex items-center justify-center shadow-xl overflow-hidden border-2 border-vgoire-gold/30">
-                      <img 
-                        src="icon.png" 
-                        alt="VGOIRE Icon"
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                    <h1 className="text-6xl font-black text-white tracking-tighter drop-shadow-2xl">VGOIRE</h1>
-                  </div>
-                </motion.div>
-                <div className="h-1 w-32 bg-vgoire-gold mx-auto rounded-full mb-4" />
-                <p className="text-vgoire-gold font-bold tracking-[0.4em] uppercase text-xs">
-                  {t.tagline}
-                </p>
-              </header>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {SERVICES.map((service) => (
-                  <ServiceCard 
-                    key={service.id} 
-                    service={service} 
-                    lang={lang}
-                    onClick={() => setSelectedService(service)}
-                  />
-                ))}
-              </div>
-
-              <footer className="mt-24 pt-12 border-t border-white/10 flex flex-col items-center gap-8">
-                <a 
-                  href={OFFICIAL_WEBSITE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="gold-button flex items-center gap-3 px-8"
-                >
-                  <Globe className="w-5 h-5" />
-                  {t.visitWebsite}
-                </a>
-                <div className="text-center text-white/40 text-xs space-y-4">
-                  <p>© {new Date().getFullYear()} VGOIRE. All rights reserved.</p>
-                  <button 
-                    onClick={() => setShowPrivacy(true)}
-                    className="text-vgoire-gold/60 hover:text-vgoire-gold underline transition-colors"
-                  >
-                    {t.privacyPolicy}
-                  </button>
-                  <p className="font-medium text-vgoire-gold/40 tracking-widest uppercase">
-                    Excellence • Security • Quality
-                  </p>
-                </div>
-              </footer>
-            </div>
-
-            <AnimatePresence>
-              {showPrivacy && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm"
-                >
-                  <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    className="bg-vgoire-blue border border-vgoire-gold/30 rounded-2xl p-8 max-w-lg w-full shadow-2xl relative"
-                  >
-                    <button 
-                      onClick={() => setShowPrivacy(false)}
-                      className="absolute top-4 right-4 text-white/60 hover:text-white"
-                    >
-                      <ChevronLeft className="w-6 h-6 rotate-90" />
-                    </button>
-                    <h2 className="text-2xl font-bold text-vgoire-gold mb-6 uppercase tracking-tight">
-                      {t.privacyPolicy}
-                    </h2>
-                    <div className="text-gray-200 leading-relaxed text-lg font-light">
-                      {t.privacyContent}
-                    </div>
-                    <button 
-                      onClick={() => setShowPrivacy(false)}
-                      className="mt-8 w-full gold-button"
-                    >
-                      Close
-                    </button>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Routes>
+        <Route path="/" element={<Home lang={lang} setLang={setLang} showSplash={showSplash} setShowSplash={setShowSplash} />} />
+        <Route path="/service/:id" element={<ServicePage lang={lang} setLang={setLang} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   );
 }
